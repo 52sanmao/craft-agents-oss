@@ -15,6 +15,7 @@ import type { AppShellContextType } from '@/context/AppShellContext'
 import { OnboardingWizard, ReauthScreen } from '@/components/onboarding'
 import { WorkspacePicker } from '@/components/workspace'
 import { ResetConfirmationDialog } from '@/components/ResetConfirmationDialog'
+import { DeleteSessionDialog } from '@/components/DeleteSessionDialog'
 import { SplashScreen } from '@/components/SplashScreen'
 import { TooltipProvider } from '@craft-agent/ui'
 import { FocusProvider } from '@/context/FocusContext'
@@ -317,6 +318,8 @@ export default function App() {
   const [appTheme, setAppTheme] = useState<ThemeOverrides | null>(null)
   // Reset confirmation dialog
   const [showResetDialog, setShowResetDialog] = useState(false)
+  const [deleteDialogSession, setDeleteDialogSession] = useState<{ id: string; name: string } | null>(null)
+  const deleteDialogResolveRef = useRef<((confirmed: boolean) => void) | null>(null)
 
   // Auto-update state
   const updateChecker = useUpdateChecker()
@@ -1124,7 +1127,10 @@ export default function App() {
       const isEmpty = !meta || (!meta.lastFinalMessageId && !meta.name)
 
       if (!isEmpty) {
-        const confirmed = await window.electronAPI.showDeleteSessionConfirmation(meta?.name || 'Untitled')
+        const confirmed = await new Promise<boolean>((resolve) => {
+          deleteDialogResolveRef.current = resolve
+          setDeleteDialogSession({ id: sessionId, name: meta?.name || 'Untitled' })
+        })
         if (!confirmed) return false
       }
     }
@@ -1913,6 +1919,18 @@ export default function App() {
             onConfirm={executeReset}
             onCancel={() => setShowResetDialog(false)}
           />
+          <DeleteSessionDialog
+            open={deleteDialogSession !== null}
+            sessionName={deleteDialogSession?.name ?? ""}
+            onConfirm={() => {
+              deleteDialogResolveRef.current?.(true)
+              setDeleteDialogSession(null)
+            }}
+            onCancel={() => {
+              deleteDialogResolveRef.current?.(false)
+              setDeleteDialogSession(null)
+            }}
+          />
         </ModalProvider>
       </DismissibleLayerProvider>
     )
@@ -2031,6 +2049,18 @@ export default function App() {
               open={showResetDialog}
               onConfirm={executeReset}
               onCancel={() => setShowResetDialog(false)}
+            />
+            <DeleteSessionDialog
+              open={deleteDialogSession !== null}
+              sessionName={deleteDialogSession?.name ?? ""}
+              onConfirm={() => {
+                deleteDialogResolveRef.current?.(true)
+                setDeleteDialogSession(null)
+              }}
+              onCancel={() => {
+                deleteDialogResolveRef.current?.(false)
+                setDeleteDialogSession(null)
+              }}
             />
           </div>
 
